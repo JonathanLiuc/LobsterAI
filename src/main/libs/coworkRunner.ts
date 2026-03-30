@@ -6,7 +6,7 @@ import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import type { PermissionResult } from '@anthropic-ai/claude-agent-sdk';
 import type { CoworkStore, CoworkMessage, CoworkExecutionMode } from '../coworkStore';
-import { getClaudeCodePath, getCurrentApiConfig } from './claudeSettings';
+import { getClaudeCodePath, getCurrentApiConfig, getCurrentProviderContextWindow } from './claudeSettings';
 import { loadClaudeSdk } from './claudeSdk';
 import { getElectronNodeRuntimePath, getEnhancedEnv, getEnhancedEnvWithTmpdir, getSkillsRoot } from './coworkUtil';
 import { coworkLog, getCoworkLogPath } from './coworkLogger';
@@ -15,6 +15,7 @@ import { isDeleteCommand, isDangerousCommand } from './commandSafety';
 import { isQuestionLikeMemoryText, type CoworkMemoryGuardLevel } from './coworkMemoryExtractor';
 import { setCoworkProxySessionId } from './coworkOpenAICompatProxy';
 import { SCHEDULED_TASK_SWITCH_MESSAGE } from '../../scheduled-task/enginePrompt';
+import { shouldSummarize, summarizeSessionHistory } from './coworkContextSummarizer';
 import { z } from 'zod';
 
 const ATTACHMENT_LINE_RE = /^\s*(?:[-*]\s*)?(输入文件|input\s*file)\s*[:：]\s*(.+?)\s*$/i;
@@ -941,6 +942,52 @@ export class CoworkRunner extends EventEmitter {
     return `<message role="${role}">\n${content}\n</message>`;
   }
 
+  /**
+   * Check if the current session's history exceeds the configured context window
+   * threshold (80%) and, if so, compress it by calling the LLM for a summary.
+   *
+   * The compressed history replaces the stored messages and a stream event is
+   * emitted so the renderer can refresh the session view.
+   */
+  private async maybeCompressSessionHistory(sessionId: string): Promise<void> {
+    const contextWindow = getCurrentProviderContextWindow();
+    if (!contextWindow) return;
+
+    const session = this.store.getSession(sessionId);
+    if (!session || session.messages.length === 0) return;
+
+    if (!shouldSummarize(session.messages, contextWindow)) return;
+
+    const apiConfig = getCurrentApiConfig('local');
+    if (!apiConfig) {
+      coworkLog('[ContextSummarizer] Cannot compress: API config unavailable');
+      return;
+    }
+
+    coworkLog(`[ContextSummarizer] Session ${sessionId} reached context threshold, compressing…`);
+
+    try {
+      const result = await summarizeSessionHistory(session.messages, apiConfig);
+      if (!result) {
+        coworkLog('[ContextSummarizer] Summarization skipped or failed, continuing normally');
+        return;
+      }
+
+      const newMessages = this.store.replaceAllMessages(sessionId, result.newMessages);
+
+      // Emit a synthetic full-session reload event so the renderer refreshes.
+      // We reuse the 'message' event for the inserted summary message.
+      const summaryMsg = newMessages.find(m => m.type === 'system' && m.content.startsWith('[CONTEXT_SUMMARY]'));
+      if (summaryMsg) {
+        this.emit('message', sessionId, summaryMsg);
+      }
+
+      coworkLog(`[ContextSummarizer] History compressed: ${session.messages.length} → ${newMessages.length} messages`);
+    } catch (err) {
+      coworkLog(`[ContextSummarizer] Unexpected error during compression: ${String(err)}`);
+    }
+  }
+
   private buildHistoryBlocks(
     messages: CoworkMessage[],
     currentPrompt: string,
@@ -1460,6 +1507,9 @@ export class CoworkRunner extends EventEmitter {
       });
       this.emit('message', sessionId, userMessage);
     }
+
+    // --- Context summarization check ---
+    await this.maybeCompressSessionHistory(sessionId);
 
     // Create abort controller
     const abortController = new AbortController();

@@ -921,6 +921,44 @@ export class CoworkStore {
   }
 
   /**
+   * Replace ALL messages in a session with a new list.
+   * Used by the context summarizer to compact history while preserving
+   * a summary message + recent turns.
+   */
+  replaceAllMessages(
+    sessionId: string,
+    messages: Array<Omit<CoworkMessage, 'id' | 'timestamp'>>,
+  ): CoworkMessage[] {
+    const now = Date.now();
+
+    this.db.run('DELETE FROM cowork_messages WHERE session_id = ?', [sessionId]);
+
+    let nextSeq = 1;
+    const inserted: CoworkMessage[] = [];
+
+    for (const msg of messages) {
+      const id = uuidv4();
+      this.db.run(`
+        INSERT INTO cowork_messages (id, session_id, type, content, metadata, created_at, sequence)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+      `, [
+        id,
+        sessionId,
+        msg.type,
+        msg.content,
+        msg.metadata ? JSON.stringify(msg.metadata) : null,
+        now,
+        nextSeq++,
+      ]);
+      inserted.push({ id, type: msg.type, content: msg.content, timestamp: now, metadata: msg.metadata });
+    }
+
+    this.db.run('UPDATE cowork_sessions SET updated_at = ? WHERE id = ?', [now, sessionId]);
+    this.saveDb();
+    return inserted;
+  }
+
+  /**
    * Replace all user/assistant messages in a session with the given list.
    * Tool messages (tool_use, tool_result, system) are preserved in their existing positions.
    * Used by history reconciliation to align local state with the authoritative gateway history.

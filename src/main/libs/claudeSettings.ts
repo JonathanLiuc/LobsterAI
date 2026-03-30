@@ -482,3 +482,24 @@ export function buildEnvForConfig(config: CoworkApiConfig): Record<string, strin
 
   return baseEnv;
 }
+
+/**
+ * Get the contextWindow (in tokens) configured for the currently active provider.
+ * Returns null if not configured.
+ */
+export function getCurrentProviderContextWindow(): number | null {
+  const sqliteStore = getStore();
+  if (!sqliteStore) return null;
+
+  const appConfig = sqliteStore.get<{
+    providers?: Record<string, { contextWindow?: number }>;
+    model?: { defaultModelProvider?: string };
+  }>('app_config');
+  if (!appConfig) return null;
+
+  const providerName = appConfig.model?.defaultModelProvider;
+  if (!providerName) return null;
+
+  const contextWindow = appConfig.providers?.[providerName]?.contextWindow;
+  return typeof contextWindow === 'number' && contextWindow > 0 ? contextWindow : null;
+}

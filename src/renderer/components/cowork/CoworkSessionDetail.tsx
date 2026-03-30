@@ -1135,6 +1135,32 @@ export const AssistantTurnBlock: React.FC<{
   const visibleAssistantItems = getVisibleAssistantItems(turn.assistantItems);
 
   const renderSystemMessage = (message: CoworkMessage) => {
+    // Special rendering for context summary messages
+    if (message.metadata?.isSummary && message.content.startsWith('[CONTEXT_SUMMARY]')) {
+      const summaryBody = message.content.replace('[CONTEXT_SUMMARY]', '').trim();
+      const summarizedCount = typeof message.metadata?.summarizedCount === 'number'
+        ? message.metadata.summarizedCount
+        : 0;
+      const label = i18nService.getLanguage() === 'zh'
+        ? `上下文摘要（已压缩 ${summarizedCount} 条消息）`
+        : `Context Summary (compressed ${summarizedCount} messages)`;
+      return (
+        <div className="rounded-lg border dark:border-amber-700/60 border-amber-400/60 dark:bg-amber-950/20 bg-amber-50/60 px-3 py-2 my-1">
+          <div className="flex items-start gap-2">
+            <span className="text-amber-500 text-xs mt-0.5 flex-shrink-0">⚡</span>
+            <div className="flex-1 min-w-0">
+              <div className="text-[11px] font-semibold text-amber-600 dark:text-amber-400 mb-1">
+                {label}
+              </div>
+              <div className="text-xs whitespace-pre-wrap dark:text-claude-darkTextSecondary text-claude-textSecondary">
+                {summaryBody}
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
     const rawContent = hasText(message.content)
       ? message.content
       : (typeof message.metadata?.error === 'string' ? message.metadata.error : '');
