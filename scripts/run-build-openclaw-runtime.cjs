@@ -27,7 +27,14 @@ function resolveBashExecutable(rootDir) {
     });
     if (result.status === 0 && result.stdout) {
       const paths = result.stdout.trim().split(/\r?\n/).map(p => p.trim()).filter(Boolean);
-      const gitBash = paths.find(p => !p.toLowerCase().includes('windowsapps'));
+      // Exclude both WSL bash locations:
+      //   - C:\Windows\System32\bash.exe  (WSL shim, not Git Bash)
+      //   - ...\WindowsApps\bash.exe       (WSL store version)
+      // Neither can access Windows-installed node/npm/pnpm.
+      const gitBash = paths.find(p => {
+        const lower = p.toLowerCase();
+        return !lower.includes('windowsapps') && !lower.includes('system32\bash');
+      });
       if (gitBash) return gitBash;
     }
   } catch {}
