@@ -23,6 +23,10 @@ export interface AppConfig {
       baseUrl: string;
       // API 协议格式：anthropic 为 Anthropic 兼容，openai 为 OpenAI 兼容
       apiFormat?: 'anthropic' | 'openai';
+      /** 模型上下文窗口大小（token 数量），用于计算用量百分比 */
+      contextWindow?: number;
+      /** 模型最大输出 token 数量 */
+      maxTokens?: number;
       models?: Array<{
         id: string;
         name: string;
@@ -34,6 +38,8 @@ export interface AppConfig {
       apiKey: string;
       baseUrl: string;
       apiFormat?: 'anthropic' | 'openai';
+      contextWindow?: number;
+      maxTokens?: number;
       models?: Array<{
         id: string;
         name: string;
@@ -47,6 +53,8 @@ export interface AppConfig {
       apiFormat?: 'anthropic' | 'openai';
       /** 是否启用 Moonshot Coding Plan 模式（使用专属 Coding API 端点） */
       codingPlanEnabled?: boolean;
+      contextWindow?: number;
+      maxTokens?: number;
       models?: Array<{
         id: string;
         name: string;
@@ -60,6 +68,8 @@ export interface AppConfig {
       apiFormat?: 'anthropic' | 'openai';
       /** 是否启用 GLM Coding Plan 模式（使用专属 Coding API 端点） */
       codingPlanEnabled?: boolean;
+      contextWindow?: number;
+      maxTokens?: number;
       models?: Array<{
         id: string;
         name: string;
@@ -77,6 +87,8 @@ export interface AppConfig {
       oauthRefreshToken?: string;
       /** OAuth token expiry as Unix timestamp in milliseconds */
       oauthTokenExpiresAt?: number;
+      contextWindow?: number;
+      maxTokens?: number;
       models?: Array<{
         id: string;
         name: string;
@@ -88,6 +100,8 @@ export interface AppConfig {
       apiKey: string;
       baseUrl: string;
       apiFormat?: 'anthropic' | 'openai';
+      contextWindow?: number;
+      maxTokens?: number;
       models?: Array<{
         id: string;
         name: string;
@@ -101,6 +115,8 @@ export interface AppConfig {
       apiFormat?: 'anthropic' | 'openai';
       /** 是否启用 Qwen Coding Plan 模式（使用专属 Coding API 端点） */
       codingPlanEnabled?: boolean;
+      contextWindow?: number;
+      maxTokens?: number;
       models?: Array<{
         id: string;
         name: string;
@@ -112,6 +128,8 @@ export interface AppConfig {
       apiKey: string;
       baseUrl: string;
       apiFormat?: 'anthropic' | 'openai';
+      contextWindow?: number;
+      maxTokens?: number;
       models?: Array<{
         id: string;
         name: string;
@@ -123,6 +141,8 @@ export interface AppConfig {
       apiKey: string;
       baseUrl: string;
       apiFormat?: 'anthropic' | 'openai';
+      contextWindow?: number;
+      maxTokens?: number;
       models?: Array<{
         id: string;
         name: string;
@@ -134,6 +154,8 @@ export interface AppConfig {
       apiKey: string;
       baseUrl: string;
       apiFormat?: 'anthropic' | 'openai';
+      contextWindow?: number;
+      maxTokens?: number;
       models?: Array<{
         id: string;
         name: string;
@@ -147,6 +169,8 @@ export interface AppConfig {
       apiFormat?: 'anthropic' | 'openai';
       /** 是否启用 Volcengine Coding Plan 模式（使用专属 Coding API 端点） */
       codingPlanEnabled?: boolean;
+      contextWindow?: number;
+      maxTokens?: number;
       models?: Array<{
         id: string;
         name: string;
@@ -158,6 +182,8 @@ export interface AppConfig {
       apiKey: string;
       baseUrl: string;
       apiFormat?: 'anthropic' | 'openai';
+      contextWindow?: number;
+      maxTokens?: number;
       models?: Array<{
         id: string;
         name: string;
@@ -169,6 +195,8 @@ export interface AppConfig {
       apiKey: string;
       baseUrl: string;
       apiFormat?: 'anthropic' | 'openai';
+      contextWindow?: number;
+      maxTokens?: number;
       models?: Array<{
         id: string;
         name: string;
@@ -180,6 +208,8 @@ export interface AppConfig {
       apiKey: string;
       baseUrl: string;
       apiFormat?: 'anthropic' | 'openai';
+      contextWindow?: number;
+      maxTokens?: number;
       models?: Array<{
         id: string;
         name: string;
@@ -191,6 +221,8 @@ export interface AppConfig {
       apiKey: string;
       baseUrl: string;
       apiFormat?: 'anthropic' | 'openai';
+      contextWindow?: number;
+      maxTokens?: number;
       models?: Array<{
         id: string;
         name: string;
@@ -206,6 +238,8 @@ export interface AppConfig {
       authType?: 'apikey' | 'oauth';
       oauthRefreshToken?: string;
       oauthTokenExpiresAt?: number;
+      contextWindow?: number;
+      maxTokens?: number;
       models?: Array<{
         id: string;
         name: string;
