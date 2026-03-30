@@ -94,6 +94,15 @@ if (process.platform === 'win32') {
   const pathValue = pathEntries.map(([, v]) => v).join(path.delimiter);
   for (const [k] of pathEntries) delete env[k];
   env.PATH = `${nodeDir}${path.delimiter}${pathValue}`;
+
+  // Convert node dir to MSYS2 Unix-style path (e.g. D:\foo\bar -> /d/foo/bar).
+  // MSYS2 auto-conversion is unreliable in nested npm/cmd.exe/node chains.
+  // Passing the MSYS2-format path via env lets the bash script prepend it
+  // to PATH before any command checks, bypassing the conversion issue.
+  const msysNodeDir = nodeDir
+    .replace(/^([A-Za-z]):/, (_, drive) => `/${drive.toLowerCase()}`)
+    .split(path.sep).join('/');
+  env.LOBSTER_NODE_MSYS_DIR = msysNodeDir;
 }
 
 // Use a relative path so bash never sees Windows drive-letter paths like
