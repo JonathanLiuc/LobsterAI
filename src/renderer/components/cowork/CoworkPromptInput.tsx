@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { PaperAirplaneIcon, StopIcon, FolderIcon } from '@heroicons/react/24/solid';
 import { PhotoIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
@@ -9,6 +9,7 @@ import FolderSelectorPopover from './FolderSelectorPopover';
 import { SkillsButton, ActiveSkillBadge } from '../skills';
 import { i18nService } from '../../services/i18n';
 import { skillService } from '../../services/skill';
+import { configService } from '../../services/config';
 import { RootState } from '../../store';
 import { setDraftPrompt, setDraftAttachments, clearDraftAttachments, type DraftAttachment } from '../../store/slices/coworkSlice';
 import { setSkills, toggleActiveSkill } from '../../store/slices/skillSlice';
@@ -113,6 +114,8 @@ const CoworkPromptInput = React.forwardRef<CoworkPromptInputRef, CoworkPromptInp
     const draftKey = sessionId || '__home__';
     const draftPrompt = useSelector((state: RootState) => state.cowork.draftPrompts[draftKey] || '');
     const attachments = useSelector((state: RootState) => state.cowork.draftAttachments[draftKey] || []) as CoworkAttachment[];
+    const currentSession = useSelector((state: RootState) => state.cowork.currentSession);
+    const selectedModel = useSelector((state: RootState) => state.model.selectedModel);
     const [value, setValue] = useState(draftPrompt);
     const [showFolderMenu, setShowFolderMenu] = useState(false);
     const [showFolderRequiredWarning, setShowFolderRequiredWarning] = useState(false);
@@ -123,6 +126,22 @@ const CoworkPromptInput = React.forwardRef<CoworkPromptInputRef, CoworkPromptInp
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const folderButtonRef = useRef<HTMLButtonElement>(null);
     const dragDepthRef = useRef(0);
+
+    // --- 上下文用量计算 ---
+    const contextUsage = useMemo(() => {
+      const providerKey = selectedModel?.providerKey;
+      const appConfig = configService.getConfig();
+      const providerConfig = providerKey ? appConfig.providers?.[providerKey] : undefined;
+      const contextWindow = providerConfig?.contextWindow;
+      if (!contextWindow || contextWindow <= 0) return null;
+
+      // 简单地用字符数 / 4 估算 token 数（行业通用近似）
+      const messages = currentSession?.messages ?? [];
+      const totalChars = messages.reduce((sum, msg) => sum + (msg.content?.length ?? 0), 0);
+      const estimatedTokens = Math.round(totalChars / 4);
+      const percentage = Math.min(100, Math.round((estimatedTokens / contextWindow) * 100));
+      return { estimatedTokens, contextWindow, percentage };
+    }, [currentSession?.messages, selectedModel?.providerKey]);
 
   // 暴露方法给父组件
   React.useImperativeHandle(ref, () => ({
@@ -589,6 +608,42 @@ const CoworkPromptInput = React.forwardRef<CoworkPromptInputRef, CoworkPromptInp
 
   return (
     <div className="relative">
+      {/* 上下文用量进度条 */}
+      {contextUsage !== null && (
+        <div className="mb-1.5">
+          <div className="flex items-center justify-between mb-0.5">
+            <span className="text-[10px] dark:text-claude-darkTextSecondary text-claude-textSecondary">
+              {i18nService.getLanguage() === 'zh' ? '上下文用量' : 'Context Usage'}
+            </span>
+            <span
+              className={`text-[10px] font-medium ${
+                contextUsage.percentage >= 90
+                  ? 'text-red-500'
+                  : contextUsage.percentage >= 70
+                    ? 'text-amber-500'
+                    : 'dark:text-claude-darkTextSecondary text-claude-textSecondary'
+              }`}
+            >
+              {contextUsage.percentage}%
+              <span className="ml-1 opacity-70">
+                (~{contextUsage.estimatedTokens.toLocaleString()} / {contextUsage.contextWindow.toLocaleString()} tokens)
+              </span>
+            </span>
+          </div>
+          <div className="w-full h-1 rounded-full dark:bg-claude-darkBorder bg-claude-border overflow-hidden">
+            <div
+              className={`h-full rounded-full transition-all duration-500 ${
+                contextUsage.percentage >= 90
+                  ? 'bg-red-500'
+                  : contextUsage.percentage >= 70
+                    ? 'bg-amber-400'
+                    : 'bg-claude-accent'
+              }`}
+              style={{ width: `${contextUsage.percentage}%` }}
+            />
+          </div>
+        </div>
+      )}
       {attachments.length > 0 && (
         <div className="mb-2 flex flex-wrap gap-2">
           {attachments.map((attachment) => (
