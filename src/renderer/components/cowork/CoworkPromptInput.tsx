@@ -115,7 +115,6 @@ const CoworkPromptInput = React.forwardRef<CoworkPromptInputRef, CoworkPromptInp
     const draftPrompt = useSelector((state: RootState) => state.cowork.draftPrompts[draftKey] || '');
     const attachments = useSelector((state: RootState) => state.cowork.draftAttachments[draftKey] || []) as CoworkAttachment[];
     const currentSession = useSelector((state: RootState) => state.cowork.currentSession);
-    const selectedModel = useSelector((state: RootState) => state.model.selectedModel);
     const [value, setValue] = useState(draftPrompt);
     const [showFolderMenu, setShowFolderMenu] = useState(false);
     const [showFolderRequiredWarning, setShowFolderRequiredWarning] = useState(false);
@@ -126,22 +125,6 @@ const CoworkPromptInput = React.forwardRef<CoworkPromptInputRef, CoworkPromptInp
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const folderButtonRef = useRef<HTMLButtonElement>(null);
     const dragDepthRef = useRef(0);
-
-    // --- 上下文用量计算 ---
-    const contextUsage = useMemo(() => {
-      const providerKey = selectedModel?.providerKey;
-      const appConfig = configService.getConfig();
-      const providerConfig = providerKey ? appConfig.providers?.[providerKey] : undefined;
-      const contextWindow = providerConfig?.contextWindow;
-      if (!contextWindow || contextWindow <= 0) return null;
-
-      // 简单地用字符数 / 4 估算 token 数（行业通用近似）
-      const messages = currentSession?.messages ?? [];
-      const totalChars = messages.reduce((sum, msg) => sum + (msg.content?.length ?? 0), 0);
-      const estimatedTokens = Math.round(totalChars / 4);
-      const percentage = Math.min(100, Math.round((estimatedTokens / contextWindow) * 100));
-      return { estimatedTokens, contextWindow, percentage };
-    }, [currentSession?.messages, selectedModel?.providerKey]);
 
   // 暴露方法给父组件
   React.useImperativeHandle(ref, () => ({
@@ -347,6 +330,22 @@ const CoworkPromptInput = React.forwardRef<CoworkPromptInputRef, CoworkPromptInp
 
   const selectedModel = useSelector((state: RootState) => state.model.selectedModel);
   const modelSupportsImage = !!selectedModel?.supportsImage;
+
+  // --- 上下文用量计算 ---
+  const contextUsage = useMemo(() => {
+    const providerKey = selectedModel?.providerKey;
+    const appConfig = configService.getConfig();
+    const providerConfig = providerKey ? appConfig.providers?.[providerKey] : undefined;
+    const contextWindow = providerConfig?.contextWindow;
+    if (!contextWindow || contextWindow <= 0) return null;
+
+    // 简单地用字符数 / 4 估算 token 数（行业通用近似）
+    const messages = currentSession?.messages ?? [];
+    const totalChars = messages.reduce((sum, msg) => sum + (msg.content?.length ?? 0), 0);
+    const estimatedTokens = Math.round(totalChars / 4);
+    const percentage = Math.min(100, Math.round((estimatedTokens / contextWindow) * 100));
+    return { estimatedTokens, contextWindow, percentage };
+  }, [currentSession?.messages, selectedModel?.providerKey]);
 
   const addAttachment = useCallback((filePath: string, imageInfo?: { isImage: boolean; dataUrl?: string }) => {
     if (!filePath) return;
