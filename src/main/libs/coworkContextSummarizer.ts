@@ -140,14 +140,14 @@ async function callLlmForSummary(
     });
 
     if (!response.ok) {
-      coworkLog(`[ContextSummarizer] LLM request failed with status ${response.status}`);
+      coworkLog('WARN', 'ContextSummarizer', `LLM request failed with status ${response.status}`);
       return null;
     }
 
     const payload = await response.json();
     return extractTextFromResponse(payload, config.apiType as 'anthropic' | 'openai');
   } catch (err) {
-    coworkLog(`[ContextSummarizer] LLM request error: ${String(err)}`);
+    coworkLog('ERROR', 'ContextSummarizer', `LLM request error: ${String(err)}`);
     return null;
   } finally {
     clearTimeout(timer);
@@ -203,11 +203,11 @@ export async function summarizeSessionHistory(
   const recentConversation = conversationMessages.slice(conversationMessages.length - keepCount);
 
   const historyText = formatMessagesForSummary(toSummarize);
-  coworkLog(`[ContextSummarizer] Summarizing ${toSummarize.length} messages (~${Math.round(historyText.length / 4)} tokens)`);
+  coworkLog('INFO', 'ContextSummarizer', `Summarizing ${toSummarize.length} messages (~${Math.round(historyText.length / 4)} tokens)`);
 
   const summaryText = await callLlmForSummary(config, historyText);
   if (!summaryText) {
-    coworkLog('[ContextSummarizer] Failed to obtain summary from LLM');
+    coworkLog('WARN', 'ContextSummarizer', 'Failed to obtain summary from LLM');
     return null;
   }
 
@@ -223,6 +223,6 @@ export async function summarizeSessionHistory(
     ...recentConversation.map(m => ({ type: m.type, content: m.content, metadata: m.metadata })),
   ];
 
-  coworkLog(`[ContextSummarizer] Summary complete: ${toSummarize.length} messages -> 1 summary + ${recentConversation.length} recent`);
+  coworkLog('INFO', 'ContextSummarizer', `Summary complete: ${toSummarize.length} messages -> 1 summary + ${recentConversation.length} recent`);
   return { newMessages, summaryText };
 }

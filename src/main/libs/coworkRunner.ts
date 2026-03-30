@@ -960,16 +960,16 @@ export class CoworkRunner extends EventEmitter {
 
     const apiConfig = getCurrentApiConfig('local');
     if (!apiConfig) {
-      coworkLog('[ContextSummarizer] Cannot compress: API config unavailable');
+      coworkLog('WARN', 'ContextSummarizer', 'Cannot compress: API config unavailable');
       return;
     }
 
-    coworkLog(`[ContextSummarizer] Session ${sessionId} reached context threshold, compressing…`);
+    coworkLog('INFO', 'ContextSummarizer', `Session ${sessionId} reached context threshold, compressing…`);
 
     try {
       const result = await summarizeSessionHistory(session.messages, apiConfig);
       if (!result) {
-        coworkLog('[ContextSummarizer] Summarization skipped or failed, continuing normally');
+        coworkLog('INFO', 'ContextSummarizer', 'Summarization skipped or failed, continuing normally');
         return;
       }
 
@@ -982,9 +982,9 @@ export class CoworkRunner extends EventEmitter {
         this.emit('message', sessionId, summaryMsg);
       }
 
-      coworkLog(`[ContextSummarizer] History compressed: ${session.messages.length} → ${newMessages.length} messages`);
+      coworkLog('INFO', 'ContextSummarizer', `History compressed: ${session.messages.length} → ${newMessages.length} messages`);
     } catch (err) {
-      coworkLog(`[ContextSummarizer] Unexpected error during compression: ${String(err)}`);
+      coworkLog('ERROR', 'ContextSummarizer', `Unexpected error during compression: ${String(err)}`);
     }
   }
 
