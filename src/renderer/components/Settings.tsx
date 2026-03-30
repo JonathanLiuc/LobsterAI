@@ -984,6 +984,18 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, onUpda
         };
       }
 
+      // contextWindow / maxTokens 需存为数字类型
+      if (field === 'contextWindow' || field === 'maxTokens') {
+        const num = value === '' ? undefined : parseInt(value, 10);
+        return {
+          ...prev,
+          [provider]: {
+            ...prev[provider],
+            [field]: Number.isFinite(num) ? num : undefined,
+          },
+        };
+      }
+
       return {
         ...prev,
         [provider]: {
@@ -2985,6 +2997,46 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, onUpda
                   </p>
                 </div>
               )}
+
+              {/* Context Window & Max Tokens 配置 */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label htmlFor={`${activeProvider}-contextWindow`} className="block text-xs font-medium dark:text-claude-darkText text-claude-text mb-1">
+                    {i18nService.t('contextWindow')}
+                  </label>
+                  <input
+                    id={`${activeProvider}-contextWindow`}
+                    type="number"
+                    min={1}
+                    step={1}
+                    value={providers[activeProvider].contextWindow ?? ''}
+                    onChange={(e) => handleProviderConfigChange(activeProvider, 'contextWindow', e.target.value)}
+                    placeholder={i18nService.t('contextWindowPlaceholder')}
+                    className="block w-full rounded-xl bg-claude-surfaceInset dark:bg-claude-darkSurfaceInset dark:border-claude-darkBorder border-claude-border border focus:border-claude-accent focus:ring-1 focus:ring-claude-accent/30 dark:text-claude-darkText text-claude-text px-3 py-2 text-xs"
+                  />
+                  <p className="mt-1 text-[11px] dark:text-claude-darkTextSecondary text-claude-textSecondary">
+                    {i18nService.t('contextWindowHint')}
+                  </p>
+                </div>
+                <div>
+                  <label htmlFor={`${activeProvider}-maxTokens`} className="block text-xs font-medium dark:text-claude-darkText text-claude-text mb-1">
+                    {i18nService.t('maxTokens')}
+                  </label>
+                  <input
+                    id={`${activeProvider}-maxTokens`}
+                    type="number"
+                    min={1}
+                    step={1}
+                    value={providers[activeProvider].maxTokens ?? ''}
+                    onChange={(e) => handleProviderConfigChange(activeProvider, 'maxTokens', e.target.value)}
+                    placeholder={i18nService.t('maxTokensPlaceholder')}
+                    className="block w-full rounded-xl bg-claude-surfaceInset dark:bg-claude-darkSurfaceInset dark:border-claude-darkBorder border-claude-border border focus:border-claude-accent focus:ring-1 focus:ring-claude-accent/30 dark:text-claude-darkText text-claude-text px-3 py-2 text-xs"
+                  />
+                  <p className="mt-1 text-[11px] dark:text-claude-darkTextSecondary text-claude-textSecondary">
+                    {i18nService.t('maxTokensHint')}
+                  </p>
+                </div>
+              </div>
 
               {/* GLM Coding Plan 开关 (仅 Zhipu) */}
               {activeProvider === 'zhipu' && (

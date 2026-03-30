@@ -19,6 +19,8 @@ export interface ApiConfig {
   baseUrl: string;
   provider?: string;
   apiFormat?: 'anthropic' | 'openai';
+  /** 用户配置的最大输出 Token 数，覆盖默认硬编码值 */
+  maxTokens?: number;
 }
 
 export class ApiError extends Error {
@@ -361,6 +363,7 @@ class ApiService {
           baseUrl,
           provider: provider,
           apiFormat,
+          maxTokens: providerConfig.maxTokens,
         };
       }
     }
@@ -448,7 +451,7 @@ class ApiService {
 
       const requestBody: any = {
         model: modelId,
-        max_tokens: 8192,
+        max_tokens: config.maxTokens ?? 8192,
         messages: messages,
         stream: true,
       };
@@ -753,6 +756,7 @@ class ApiService {
           : {
               model: modelId,
               messages: messages,
+              max_tokens: config.maxTokens ?? 8192,
               stream: true,
             };
         if (useResponsesApi && systemInstructions) {
