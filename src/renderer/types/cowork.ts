@@ -67,6 +67,7 @@ export interface CoworkConfig {
   memoryLlmJudgeEnabled: boolean;
   memoryGuardLevel: 'strict' | 'standard' | 'relaxed';
   memoryUserMemoriesMaxItems: number;
+  showContextWindowBar: boolean;
 }
 
 export type CoworkConfigUpdate = Partial<Pick<
@@ -79,6 +80,7 @@ export type CoworkConfigUpdate = Partial<Pick<
   | 'memoryLlmJudgeEnabled'
   | 'memoryGuardLevel'
   | 'memoryUserMemoriesMaxItems'
+  | 'showContextWindowBar'
 >>;
 
 export interface CoworkApiConfig {

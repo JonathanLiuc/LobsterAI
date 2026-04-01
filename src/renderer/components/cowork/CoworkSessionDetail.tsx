@@ -1023,6 +1023,126 @@ const AssistantMessageItem: React.FC<{
 };
 
 // Streaming activity bar shown between messages and input
+const CONTEXT_WINDOW_SIZE_MAP: Array<[string, number]> = [
+  ['gemini-1.5', 1_000_000],
+  ['gemini-2', 1_000_000],
+  ['claude', 200_000],
+  ['gpt-4o', 128_000],
+  ['gpt-4', 128_000],
+  ['kimi', 128_000],
+  ['moonshot', 128_000],
+  ['qwen', 128_000],
+  ['deepseek', 64_000],
+  ['gemini', 32_000],
+  ['gpt-3.5', 16_385],
+];
+
+const resolveContextWindowSize = (modelId: string): number => {
+  const id = modelId.toLowerCase();
+  for (const [key, size] of CONTEXT_WINDOW_SIZE_MAP) {
+    if (id.includes(key)) return size;
+  }
+  return 128_000;
+};
+
+const ContextWindowBar: React.FC<{
+  show: boolean;
+  messages: CoworkMessage[];
+  modelId?: string;
+  sessionId?: string;
+}> = ({ show, messages, modelId, sessionId }) => {
+  const sessionUsage = useSelector((state: RootState) =>
+    sessionId ? state.cowork.sessionUsage[sessionId] : undefined
+  );
+
+  const totalChars = useMemo(
+    () => messages.reduce((sum, m) => sum + (m.content?.length ?? 0), 0),
+    [messages],
+  );
+
+  if (!show) return null;
+
+  // Use actual API-reported input tokens when available, fall back to char-based estimate
+  const estimatedTokens = sessionUsage?.inputTokens ?? Math.round(totalChars / 4);
+  const isActualUsage = sessionUsage?.inputTokens !== undefined;
+  const contextWindowSize = resolveContextWindowSize(modelId ?? '');
+  const ratio = Math.min(1, estimatedTokens / contextWindowSize);
+  const percentage = Math.round(ratio * 100);
+
+  // SVG ring params
+  const RING_SIZE = 28;
+  const STROKE = 2.5;
+  const RADIUS = (RING_SIZE - STROKE) / 2;
+  const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
+  const dashOffset = CIRCUMFERENCE * (1 - ratio);
+
+  const ringColor =
+    percentage >= 80 ? '#ef4444'
+    : percentage >= 60 ? '#f59e0b'
+    : 'var(--color-claude-accent, #f97316)';
+
+  const textColor =
+    percentage >= 80 ? 'text-red-500 dark:text-red-400'
+    : percentage >= 60 ? 'text-amber-500 dark:text-amber-400'
+    : 'dark:text-claude-darkTextSecondary text-claude-textSecondary';
+
+  const contextWindowK = contextWindowSize >= 1_000_000
+    ? `${(contextWindowSize / 1_000_000).toFixed(1)}m`
+    : `${Math.round(contextWindowSize / 1_000)}k`;
+
+  return (
+    <div
+      className="flex items-center gap-1.5 px-0.5"
+      title={isActualUsage
+        ? i18nService.t('coworkContextWindowBarTooltipExact')
+        : i18nService.t('coworkContextWindowBarTooltip')}
+    >
+      {/* SVG Donut Ring */}
+      <div className="relative flex-shrink-0" style={{ width: RING_SIZE, height: RING_SIZE }}>
+        <svg width={RING_SIZE} height={RING_SIZE} viewBox={`0 0 ${RING_SIZE} ${RING_SIZE}`} className="-rotate-90">
+          {/* Track */}
+          <circle
+            cx={RING_SIZE / 2}
+            cy={RING_SIZE / 2}
+            r={RADIUS}
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={STROKE}
+            className="text-claude-border dark:text-claude-darkBorder"
+            strokeOpacity={0.4}
+          />
+          {/* Progress arc */}
+          <circle
+            cx={RING_SIZE / 2}
+            cy={RING_SIZE / 2}
+            r={RADIUS}
+            fill="none"
+            stroke={ringColor}
+            strokeWidth={STROKE}
+            strokeLinecap="round"
+            strokeDasharray={CIRCUMFERENCE}
+            strokeDashoffset={dashOffset}
+            style={{ transition: 'stroke-dashoffset 0.5s ease, stroke 0.3s ease' }}
+          />
+        </svg>
+      </div>
+
+      {/* Percentage text beside the ring */}
+      <span className={`text-[11px] font-mono font-semibold tabular-nums leading-none ${textColor}`}>
+        {isActualUsage ? '' : '~'}{percentage}%
+      </span>
+      {/* Token count: exact value shown as-is, estimate prefixed with ~ */}
+      <span className={`text-[10px] font-mono tabular-nums leading-none opacity-50 ${textColor}`}>
+        {!isActualUsage && '~'}
+        {estimatedTokens >= 1000
+          ? `${(estimatedTokens / 1000).toFixed(1)}k`
+          : estimatedTokens.toLocaleString()}
+        {' '}/{' '}{contextWindowK}
+      </span>
+    </div>
+  );
+};
+
 const StreamingActivityBar: React.FC<{ messages: CoworkMessage[] }> = ({ messages }) => {
   // Walk messages backwards to find the latest tool_use without a paired tool_result
   const getStatusText = (): string => {
@@ -1292,6 +1412,8 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
   const isStreaming = useSelector((state: RootState) => state.cowork.isStreaming);
   const remoteManaged = useSelector((state: RootState) => state.cowork.remoteManaged);
   const skills = useSelector((state: RootState) => state.skill.skills);
+  const showContextWindowBar = useSelector((state: RootState) => state.cowork.config.showContextWindowBar);
+  const selectedModel = useSelector((state: RootState) => state.model.selectedModel);
   const detailRootRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [shouldAutoScroll, setShouldAutoScroll] = useState(true);
@@ -2340,7 +2462,14 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
 
       {/* Input Area */}
       <div className="p-4 shrink-0">
-        <div className="max-w-3xl mx-auto">
+        <div className="max-w-3xl mx-auto space-y-2">
+          {/* Context Window Ring — shown above input when enabled */}
+          <ContextWindowBar
+            show={showContextWindowBar}
+            messages={currentSession.messages}
+            modelId={selectedModel?.id}
+            sessionId={currentSession.id}
+          />
           <CoworkPromptInput
             onSubmit={onContinue}
             onStop={onStop}

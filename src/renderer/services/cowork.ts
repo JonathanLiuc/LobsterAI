@@ -17,6 +17,7 @@ import {
   clearPendingPermissions,
   setConfig,
   clearCurrentSession,
+  updateSessionUsage,
 } from '../store/slices/coworkSlice';
 import type {
   CoworkSession,
@@ -137,8 +138,11 @@ class CoworkService {
     this.streamListenerCleanups.push(permissionDismissCleanup);
 
     // Complete listener
-    const completeCleanup = cowork.onStreamComplete(({ sessionId }) => {
+    const completeCleanup = cowork.onStreamComplete(({ sessionId, usage }) => {
       store.dispatch(updateSessionStatus({ sessionId, status: 'completed' }));
+      if (usage) {
+        store.dispatch(updateSessionUsage({ sessionId, usage }));
+      }
     });
     this.streamListenerCleanups.push(completeCleanup);
 

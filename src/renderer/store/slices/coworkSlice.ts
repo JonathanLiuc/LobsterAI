@@ -15,10 +15,19 @@ export interface DraftAttachment {
   dataUrl?: string;
 }
 
+export interface CoworkSessionUsage {
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadInputTokens?: number;
+  cacheCreationInputTokens?: number;
+}
+
 interface CoworkState {
   sessions: CoworkSessionSummary[];
   currentSessionId: string | null;
   currentSession: CoworkSession | null;
+  /** Last known API token usage keyed by sessionId */
+  sessionUsage: Record<string, CoworkSessionUsage>;
   draftPrompts: Record<string, string>;
   /** Keyed by draftKey (sessionId or '__home__'), stores pending attachments */
   draftAttachments: Record<string, DraftAttachment[]>;
@@ -34,6 +43,7 @@ const initialState: CoworkState = {
   sessions: [],
   currentSessionId: null,
   currentSession: null,
+  sessionUsage: {},
   draftPrompts: {},
   draftAttachments: {},
   unreadSessionIds: [],
@@ -51,6 +61,7 @@ const initialState: CoworkState = {
     memoryLlmJudgeEnabled: false,
     memoryGuardLevel: 'strict',
     memoryUserMemoriesMaxItems: 12,
+    showContextWindowBar: false,
   },
 };
 
@@ -338,6 +349,11 @@ const coworkSlice = createSlice({
     clearDraftAttachments(state, action: PayloadAction<string>) {
       delete state.draftAttachments[action.payload];
     },
+
+    updateSessionUsage(state, action: PayloadAction<{ sessionId: string; usage: CoworkSessionUsage }>) {
+      const { sessionId, usage } = action.payload;
+      state.sessionUsage[sessionId] = usage;
+    },
   },
 });
 
@@ -365,6 +381,7 @@ export const {
   setConfig,
   updateConfig,
   clearCurrentSession,
+  updateSessionUsage,
 } = coworkSlice.actions;
 
 export default coworkSlice.reducer;

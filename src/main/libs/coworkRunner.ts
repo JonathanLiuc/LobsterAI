@@ -167,7 +167,7 @@ export interface CoworkRunnerEvents {
   message: (sessionId: string, message: CoworkMessage) => void;
   messageUpdate: (sessionId: string, messageId: string, content: string) => void;
   permissionRequest: (sessionId: string, request: PermissionRequest) => void;
-  complete: (sessionId: string, claudeSessionId: string | null) => void;
+  complete: (sessionId: string, claudeSessionId: string | null, usage?: ActiveSessionUsage) => void;
   error: (sessionId: string, error: string) => void;
 }
 
@@ -177,6 +177,13 @@ export interface PermissionRequest {
   toolInput: Record<string, unknown>;
 }
 
+interface ActiveSessionUsage {
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadInputTokens?: number;
+  cacheCreationInputTokens?: number;
+}
+
 interface ActiveSession {
   sessionId: string;
   claudeSessionId: string | null;
@@ -184,6 +191,7 @@ interface ActiveSession {
   confirmationMode: 'modal' | 'text';
   pendingPermission: PermissionRequest | null;
   abortController: AbortController;
+  lastTurnUsage: ActiveSessionUsage | null;
   // Track the current streaming message for incremental updates
   currentStreamingMessageId: string | null;
   currentStreamingContent: string;
@@ -1491,6 +1499,7 @@ export class CoworkRunner extends EventEmitter {
       hasAssistantThinkingOutput: false,
       executionMode: 'local',
       autoApprove: options.autoApprove ?? false,
+      lastTurnUsage: null,
     };
     this.activeSessions.set(sessionId, activeSession);
     if (session.cwd !== sessionCwd) {
@@ -2416,7 +2425,7 @@ export class CoworkRunner extends EventEmitter {
       if (session?.status !== 'error') {
         this.store.updateSession(sessionId, { status: 'completed' });
         this.applyTurnMemoryUpdatesForSession(sessionId);
-        this.emit('complete', sessionId, activeSession.claudeSessionId);
+        this.emit('complete', sessionId, activeSession.claudeSessionId, activeSession.lastTurnUsage ?? undefined);
       }
     } catch (error) {
       // Clean up startup timer if still pending
@@ -2570,15 +2579,22 @@ export class CoworkRunner extends EventEmitter {
     }
 
     if (eventType === 'result') {
-      // Log token usage for observability
+      // Extract and store token usage for observability and IPC forwarding
       const usage = (payload.usage ?? (payload.result && typeof payload.result === 'object' ? (payload.result as Record<string, unknown>).usage : undefined)) as Record<string, unknown> | undefined;
       if (usage) {
+        const turnUsage: ActiveSessionUsage = {
+          inputTokens: Number(usage.input_tokens) || 0,
+          outputTokens: Number(usage.output_tokens) || 0,
+          cacheReadInputTokens: usage.cache_read_input_tokens !== undefined ? Number(usage.cache_read_input_tokens) : undefined,
+          cacheCreationInputTokens: usage.cache_creation_input_tokens !== undefined ? Number(usage.cache_creation_input_tokens) : undefined,
+        };
+        activeSession.lastTurnUsage = turnUsage;
         coworkLog('INFO', 'tokenUsage', 'Turn token usage', {
           sessionId,
-          inputTokens: usage.input_tokens,
-          outputTokens: usage.output_tokens,
-          cacheReadInputTokens: usage.cache_read_input_tokens,
-          cacheCreationInputTokens: usage.cache_creation_input_tokens,
+          inputTokens: turnUsage.inputTokens,
+          outputTokens: turnUsage.outputTokens,
+          cacheReadInputTokens: turnUsage.cacheReadInputTokens,
+          cacheCreationInputTokens: turnUsage.cacheCreationInputTokens,
         });
       }
 
@@ -2962,6 +2978,39 @@ export class CoworkRunner extends EventEmitter {
       }
 
       activeSession.currentStreamingBlockType = null;
+      return;
+    }
+
+    // Handle message_start - capture input token usage from API response
+    if (eventType === 'message_start') {
+      const message = event.message as Record<string, unknown> | undefined;
+      const usage = message?.usage as Record<string, unknown> | undefined;
+      if (usage && typeof usage.input_tokens === 'number') {
+        const existing = activeSession.lastTurnUsage;
+        activeSession.lastTurnUsage = {
+          inputTokens: usage.input_tokens,
+          outputTokens: existing?.outputTokens ?? 0,
+          cacheReadInputTokens: typeof usage.cache_read_input_tokens === 'number' ? usage.cache_read_input_tokens : existing?.cacheReadInputTokens,
+          cacheCreationInputTokens: typeof usage.cache_creation_input_tokens === 'number' ? usage.cache_creation_input_tokens : existing?.cacheCreationInputTokens,
+        };
+        console.debug('[CoworkRunner] message_start usage captured, input_tokens:', usage.input_tokens);
+      }
+      return;
+    }
+
+    // Handle message_delta - capture output token usage from API response
+    if (eventType === 'message_delta') {
+      const usage = event.usage as Record<string, unknown> | undefined;
+      if (usage && typeof usage.output_tokens === 'number') {
+        const existing = activeSession.lastTurnUsage;
+        activeSession.lastTurnUsage = {
+          inputTokens: existing?.inputTokens ?? 0,
+          outputTokens: usage.output_tokens,
+          cacheReadInputTokens: existing?.cacheReadInputTokens,
+          cacheCreationInputTokens: existing?.cacheCreationInputTokens,
+        };
+        console.debug('[CoworkRunner] message_delta usage captured, output_tokens:', usage.output_tokens);
+      }
       return;
     }
 

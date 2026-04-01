@@ -1,0 +1,73 @@
+feat(cowork): 新增上下文窗口（Context Window）用量可视化圆环指示器
+
+功能描述
+
+在 Cowork 对话界面的消息输入框上方，新增一个圆环形 Token 用量指示器，用于实时展示当前会话对上下文窗口的消耗情况。支持在设置中开关，默认关闭。
+
+数据来源优先使用后端 API 实际返回的 input_tokens（精确值）；若精确值尚未到达（对话首轮发送前或流式输出过程中），则回落到基于消息内容字符数的估算值（约 4 字符/token）。两种状态通过 ~ 前缀加以区分。
+
+价值点
+
+- 避免上下文溢出：长对话中用户无感知地逼近上下文上限，往往导致模型截断历史、输出质量骤降，甚至 API 报错。圆环提前预警，让用户及时新建会话或清理历史。
+- 数据精准可信：通过后端透传真实 input_tokens，避免纯字符估算的系统性偏差（多模态附件、工具调用 schema 等不可见 token 均被正确计入）。
+- 无打扰设计：默认关闭、位于输入框上方且尺寸仅 28px，不影响对话正文的阅读与交互。
+- 渐进式呈现：流式输出期间以估算值保持视觉连续性，turn 完成后无缝切换为精确值，体验无跳变感。
+- 多模型兼容：内置主流模型上下文窗口映射表（Claude 200k、Gemini 1M、GPT-4 128k 等），未命中规则时自动回落，不因模型切换而失效。
+
+---
+
+改动内容
+
+1. 后端 Token 用量透传链路
+   - coworkRunner.ts 在收到 SDK result 事件时，将 API 返回的 input_tokens / output_tokens 等字段存入 activeSession.lastTurnUsage，并在 complete 事件中随会话 ID 一并 emit 出去。
+   - types.ts 新增 CoworkTurnUsage 接口，complete 事件签名增加可选 usage 参数。
+   - claudeRuntimeAdapter.ts / coworkEngineRouter.ts 在各自的 complete 事件监听中透传 usage。
+   - main.ts IPC 推送 cowork:stream:complete 时附带 usage 字段。
+   - preload.ts 更新 onStreamComplete 回调的类型定义。
+
+2. 前端状态管理
+   - coworkSlice.ts 新增 CoworkSessionUsage 接口、sessionUsage 状态字段（Record<sessionId, usage>）及 updateSessionUsage action。
+   - cowork.ts（service）在 onStreamComplete 回调中，若 usage 存在则 dispatch updateSessionUsage。
+   - CoworkSessionDetail.tsx 中 ContextWindowBar 组件通过 useSelector 读取当前 session 的精确用量，有则优先使用，无则回落字符估算。
+
+3. UI 组件
+   - CoworkSessionDetail.tsx 新增 ContextWindowBar 组件：28px SVG 圆环（带动画描边），圆环右侧展示百分比和 token 数值（如 12% / 24.3k / 200k）。颜色随用量变化：正常→accent，>60%→橙色，>80%→红色。精确值直接展示，估算值加 ~ 前缀。
+   - 圆环渲染于输入框正上方，不遮挡对话内容。
+   - 新增 resolveContextWindowSize() 函数，按模型 ID 关键词映射各厂商模型的上下文窗口大小（claude→200k，gemini-1.5/2→1M，gpt-4→128k 等），未命中则回落 128k。
+
+4. 设置开关
+   - Settings.tsx 在 Agent Engine 配置区新增「显示上下文窗口使用量」Toggle，与 config.showContextWindowBar 双向绑定，点击保存后持久化。
+   - cowork.ts 类型定义（CoworkConfig / CoworkConfigUpdate）新增 showContextWindowBar 字段。
+   - coworkSlice.ts 初始状态 showContextWindowBar: false。
+
+5. 国际化
+   - i18n.ts 新增中英文 key：coworkShowContextWindowBar、coworkShowContextWindowBarHint、coworkContextWindowBarLabel、coworkContextWindowBarTooltip（估算）、coworkContextWindowBarTooltipExact（精确）。
+
+---
+
+修改文件
+
+文件                                                         变更
+src/main/libs/agentEngine/types.ts                           新增 CoworkTurnUsage 接口；complete 事件签名增加 usage 可选参数
+src/main/libs/coworkRunner.ts                                result 事件中提取并存储 usage 到 activeSession；complete emit 携带 usage
+src/main/libs/agentEngine/claudeRuntimeAdapter.ts            complete 监听透传 usage
+src/main/libs/agentEngine/coworkEngineRouter.ts              complete 监听透传 usage
+src/main/main.ts                                             IPC cowork:stream:complete 推送携带 usage
+src/main/preload.ts                                          onStreamComplete 类型含 usage
+src/renderer/types/cowork.ts                                 CoworkConfig / CoworkConfigUpdate 新增 showContextWindowBar
+src/renderer/store/slices/coworkSlice.ts                     新增 CoworkSessionUsage、sessionUsage 状态、updateSessionUsage action
+src/renderer/services/cowork.ts                              complete 监听 dispatch updateSessionUsage；导入新 action
+src/renderer/services/i18n.ts                                新增 5 个中英文 i18n key
+src/renderer/components/Settings.tsx                         新增上下文窗口显示开关 UI
+src/renderer/components/cowork/CoworkSessionDetail.tsx       新增 ContextWindowBar 组件及 resolveContextWindowSize；调用处传入 sessionId
+
+---
+
+测试验证
+
+1. 开启开关：设置 → Agent Engine → 开启「显示上下文窗口使用量」→ 保存，输入框上方出现圆环。
+2. 估算阶段：发送第一条消息后、turn 完成前，圆环显示 ~XX% 和 ~XXk / YYk（带 ~ 前缀）。
+3. 精确值切换：turn 完成后，圆环数值切换为精确 token 数（无 ~ 前缀），hover tooltip 显示「来自 API 实际返回值」。
+4. 颜色变化：用量超过 60% 变橙色，超过 80% 变红色。
+5. 关闭开关：保存后圆环消失，不影响正常对话流程。
+6. OpenClaw 引擎：无 usage 数据时自动回落估算模式，功能正常。

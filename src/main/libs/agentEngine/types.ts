@@ -12,11 +12,18 @@ export interface PermissionRequest {
   toolUseId?: string | null;
 }
 
+export interface CoworkTurnUsage {
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadInputTokens?: number;
+  cacheCreationInputTokens?: number;
+}
+
 export interface CoworkRuntimeEvents {
   message: (sessionId: string, message: CoworkMessage) => void;
   messageUpdate: (sessionId: string, messageId: string, content: string) => void;
   permissionRequest: (sessionId: string, request: PermissionRequest) => void;
-  complete: (sessionId: string, claudeSessionId: string | null) => void;
+  complete: (sessionId: string, claudeSessionId: string | null, usage?: CoworkTurnUsage) => void;
   error: (sessionId: string, error: string) => void;
 }
 

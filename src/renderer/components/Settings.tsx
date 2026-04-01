@@ -575,6 +575,7 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, onUpda
   const coworkConfig = useSelector((state: RootState) => state.cowork.config);
 
   const [coworkAgentEngine, setCoworkAgentEngine] = useState<CoworkAgentEngine>(coworkConfig.agentEngine || 'openclaw');
+  const [coworkShowContextWindowBar, setCoworkShowContextWindowBar] = useState<boolean>(coworkConfig.showContextWindowBar ?? false);
   const [coworkMemoryEnabled, setCoworkMemoryEnabled] = useState<boolean>(coworkConfig.memoryEnabled ?? true);
   const [coworkMemoryLlmJudgeEnabled, setCoworkMemoryLlmJudgeEnabled] = useState<boolean>(coworkConfig.memoryLlmJudgeEnabled ?? false);
   const [coworkMemoryEntries, setCoworkMemoryEntries] = useState<CoworkUserMemoryEntry[]>([]);
@@ -592,10 +593,12 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, onUpda
 
   useEffect(() => {
     setCoworkAgentEngine(coworkConfig.agentEngine || 'openclaw');
+    setCoworkShowContextWindowBar(coworkConfig.showContextWindowBar ?? false);
     setCoworkMemoryEnabled(coworkConfig.memoryEnabled ?? true);
     setCoworkMemoryLlmJudgeEnabled(coworkConfig.memoryLlmJudgeEnabled ?? false);
   }, [
     coworkConfig.agentEngine,
+    coworkConfig.showContextWindowBar,
     coworkConfig.memoryEnabled,
     coworkConfig.memoryLlmJudgeEnabled,
   ]);
@@ -1165,6 +1168,7 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, onUpda
   };
 
   const hasCoworkConfigChanges = coworkAgentEngine !== coworkConfig.agentEngine
+    || coworkShowContextWindowBar !== (coworkConfig.showContextWindowBar ?? false)
     || coworkMemoryEnabled !== coworkConfig.memoryEnabled
     || coworkMemoryLlmJudgeEnabled !== coworkConfig.memoryLlmJudgeEnabled;
   const isOpenClawAgentEngine = coworkAgentEngine === 'openclaw';
@@ -1429,6 +1433,7 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, onUpda
       if (hasCoworkConfigChanges) {
         const updated = await coworkService.updateConfig({
           agentEngine: coworkAgentEngine,
+          showContextWindowBar: coworkShowContextWindowBar,
           memoryEnabled: coworkMemoryEnabled,
           memoryLlmJudgeEnabled: coworkMemoryLlmJudgeEnabled,
         });
@@ -2365,6 +2370,32 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, onUpda
                 </span>
               </div>
             </div>
+
+            {/* Context Window Bar Toggle */}
+            <div className="rounded-xl border px-4 py-4 dark:border-claude-darkBorder border-claude-border space-y-1">
+              <label className="flex items-center justify-between cursor-pointer">
+                <div className="space-y-0.5 pr-4">
+                  <div className="text-sm font-medium dark:text-claude-darkText text-claude-text">
+                    {i18nService.t('coworkShowContextWindowBar')}
+                  </div>
+                  <div className="text-xs dark:text-claude-darkTextSecondary text-claude-textSecondary">
+                    {i18nService.t('coworkShowContextWindowBarHint')}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={coworkShowContextWindowBar}
+                  onClick={() => setCoworkShowContextWindowBar(v => !v)}
+                  className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus-visible:ring-2 focus-visible:ring-claude-accent ${coworkShowContextWindowBar ? 'bg-claude-accent' : 'dark:bg-claude-darkBorder bg-gray-300'}`}
+                >
+                  <span
+                    className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${coworkShowContextWindowBar ? 'translate-x-4' : 'translate-x-0'}`}
+                  />
+                </button>
+              </label>
+            </div>
+
             {isOpenClawAgentEngine && (
               <div className="space-y-3 rounded-xl border px-4 py-4 dark:border-claude-darkBorder border-claude-border">
                 <div className="text-xs dark:text-claude-darkTextSecondary text-claude-textSecondary">

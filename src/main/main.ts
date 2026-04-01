@@ -1062,11 +1062,11 @@ const bindCoworkRuntimeForwarder = (): void => {
     });
   });
 
-  runtime.on('complete', (sessionId: string, claudeSessionId: string | null) => {
+  runtime.on('complete', (sessionId: string, claudeSessionId: string | null, usage) => {
     const windows = BrowserWindow.getAllWindows();
     windows.forEach((win) => {
       if (win.isDestroyed()) return;
-      win.webContents.send('cowork:stream:complete', { sessionId, claudeSessionId });
+      win.webContents.send('cowork:stream:complete', { sessionId, claudeSessionId, usage });
     });
     // If session used a server model, notify renderer to refresh quota
     try {

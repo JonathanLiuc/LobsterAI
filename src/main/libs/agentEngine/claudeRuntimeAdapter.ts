@@ -6,6 +6,7 @@ import type {
   CoworkRuntime,
   CoworkRuntimeEvents,
   CoworkStartOptions,
+  CoworkTurnUsage,
 } from './types';
 
 export class ClaudeRuntimeAdapter extends EventEmitter implements CoworkRuntime {
@@ -69,8 +70,8 @@ export class ClaudeRuntimeAdapter extends EventEmitter implements CoworkRuntime 
     this.runner.on('permissionRequest', (sessionId, request) => {
       this.emit('permissionRequest', sessionId, request);
     });
-    this.runner.on('complete', (sessionId, claudeSessionId) => {
-      this.emit('complete', sessionId, claudeSessionId);
+    this.runner.on('complete', (sessionId, claudeSessionId, usage?: CoworkTurnUsage) => {
+      this.emit('complete', sessionId, claudeSessionId, usage);
     });
     this.runner.on('error', (sessionId, error) => {
       this.emit('error', sessionId, error);
